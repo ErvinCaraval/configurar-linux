@@ -93,7 +93,7 @@ docker info
 # Instalación de Docker Compose
 # -------------------------
 echo "Instalando Docker Compose..."
-DOCKER_COMPOSE_VERSION="2.39.1" 
+DOCKER_COMPOSE_VERSION="2.24.0" 
 sudo curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 
 # Asignar permisos de ejecución
