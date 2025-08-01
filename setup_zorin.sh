@@ -141,19 +141,26 @@ sudo apt install scrcpy android-tools-adb -y
 # -----------------------------
 # Instalación de Virtual box
 # -----------------------------
-echo "2. Añadiendo la clave GPG de Oracle..."
-wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox.gpg
+echo "Añadiendo prerequisitos para VirtualBox..."
+sudo apt install -y wget gnupg dkms linux-headers-$(uname -r)
 
-echo "3. Añadiendo el repositorio de VirtualBox (para Ubuntu jammy / Zorin 17)..."
-echo "deb [signed-by=/usr/share/keyrings/oracle-virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian jammy contrib" > /etc/apt/sources.list.d/virtualbox.list
+echo "Añadiendo la clave GPG de Oracle..."
+wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | sudo gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox.gpg
 
-echo "4. Actualizando caché e instalando VirtualBox 7.1..."
-apt update
-apt install -y virtualbox-7.1
+echo "Añadiendo el repositorio de VirtualBox (jammy)..."
+echo "deb [signed-by=/usr/share/keyrings/oracle-virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian jammy contrib" | sudo tee /etc/apt/sources.list.d/virtualbox.list
 
-echo "5. Verificando la instalación..."
+echo "Actualizando caché e instalando VirtualBox 7.1..."
+sudo apt update
+sudo apt install -y virtualbox-7.1
+
+echo "Reconstruyendo módulos del kernel si es necesario..."
+if command -v /sbin/vboxconfig &> /dev/null; then
+  sudo /sbin/vboxconfig || true
+fi
+
+echo "Verificando la instalación de VirtualBox..."
 virtualbox --version
-
 
 # -------------------------
 # Finalización
