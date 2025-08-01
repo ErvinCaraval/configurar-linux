@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # -------------------------
 # Actualizar el sistema
@@ -135,6 +136,38 @@ sudo snap install android-studio --classic
 # -----------------------------
 echo "Instalación de scrcpy:"
 sudo apt install scrcpy android-tools-adb -y
+
+
+# -----------------------------
+# Instalación de Virtual box
+# -----------------------------
+if [[ $EUID -ne 0 ]]; then
+  echo "Este script necesita ejecutarse con sudo o como root."
+  exit 1
+fi
+
+echo "1. Actualizando la lista de paquetes e instalando prerequisitos..."
+apt update
+apt upgrade -y
+apt install -y wget gnupg
+
+echo "2. Añadiendo la clave GPG de Oracle..."
+wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox.gpg
+
+echo "3. Añadiendo el repositorio de VirtualBox (para Ubuntu jammy / Zorin 17)..."
+echo "deb [signed-by=/usr/share/keyrings/oracle-virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian jammy contrib" > /etc/apt/sources.list.d/virtualbox.list
+
+echo "4. Actualizando caché e instalando VirtualBox 7.1..."
+apt update
+apt install -y virtualbox-7.1
+
+echo "5. Verificando la instalación..."
+virtualbox --version
+
+echo "6. (Re)construyendo módulos del kernel si es necesario..."
+if command -v /sbin/vboxconfig &> /dev/null; then
+  /sbin/vboxconfig || true
+fi
 
 # -------------------------
 # Finalización
