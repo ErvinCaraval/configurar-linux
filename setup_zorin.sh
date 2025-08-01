@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+
 
 # -------------------------
 # Actualizar el sistema
@@ -141,16 +141,6 @@ sudo apt install scrcpy android-tools-adb -y
 # -----------------------------
 # Instalación de Virtual box
 # -----------------------------
-if [[ $EUID -ne 0 ]]; then
-  echo "Este script necesita ejecutarse con sudo o como root."
-  exit 1
-fi
-
-echo "1. Actualizando la lista de paquetes e instalando prerequisitos..."
-apt update
-apt upgrade -y
-apt install -y wget gnupg
-
 echo "2. Añadiendo la clave GPG de Oracle..."
 wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox.gpg
 
@@ -164,10 +154,6 @@ apt install -y virtualbox-7.1
 echo "5. Verificando la instalación..."
 virtualbox --version
 
-echo "6. (Re)construyendo módulos del kernel si es necesario..."
-if command -v /sbin/vboxconfig &> /dev/null; then
-  /sbin/vboxconfig || true
-fi
 
 # -------------------------
 # Finalización
