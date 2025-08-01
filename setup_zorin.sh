@@ -124,6 +124,18 @@ sudo install minikube-linux-amd64 /usr/local/bin/minikube
 echo "Versión de Minikube instalada:"
 minikube version
 
+# -----------------------------
+# Instalación de Android Studio
+# -----------------------------
+echo "Instalación de Android Studio:"
+sudo snap install android-studio --classic
+
+# -----------------------------
+# Instalación de scrcpy
+# -----------------------------
+echo "Instalación de scrcpy:"
+sudo apt install scrcpy android-tools-adb -y
+
 # -------------------------
 # Finalización
 # -------------------------
