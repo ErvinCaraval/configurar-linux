@@ -1,173 +1,229 @@
 #!/bin/bash
 
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+# Función de ayuda
+echo_header() {
+  echo
+  echo "=============================="
+  echo " $1"
+  echo "=============================="
+}
+
+# Verificar que se ejecute con permisos de sudo
+if [[ "$EUID" -ne 0 ]]; then
+  echo "Este script necesita ejecutarse con sudo. Usa: sudo $0"
+  exit 1
+fi
+
+# Variables
+GIT_EMAIL="ervin.caravali@correounivalle.edu.co"
+GIT_NAME="ErvinCaraval"
+DOCKER_COMPOSE_PLUGIN="docker-compose-plugin"
 
 # -------------------------
 # Actualizar el sistema
 # -------------------------
-echo "Actualizando el sistema..."
-sudo apt update && sudo apt upgrade -y
+echo_header "Actualizando el sistema"
+apt update -y
+apt upgrade -y
 
 # -------------------------
 # Instalación de Git
 # -------------------------
-echo "Instalando Git..."
-sudo apt install git -y
+echo_header "Instalando y configurando Git"
+if ! command -v git &> /dev/null; then
+  apt install -y git
+else
+  echo "Git ya está instalado."
+fi
 
-# Configurar usuario de Git
-git config --global user.email "ervin.caravali@correounivalle.edu.co"
-git config --global user.name "ErvinCaraval"
+git config --global user.email "${GIT_EMAIL}"
+git config --global user.name "${GIT_NAME}"
 echo "Git configurado con usuario y correo."
 
 # -------------------------
-# Instalación de Flatpak
+# Instalación de Flatpak y Racket
 # -------------------------
-echo "Instalando Flatpak..."
-sudo apt install -y flatpak
+echo_header "Instalando Flatpak y Racket"
+if ! command -v flatpak &> /dev/null; then
+  apt install -y flatpak
+else
+  echo "Flatpak ya está instalado."
+fi
 
-# Agregar el repositorio Flathub (si no existe)
-echo "Agregando Flathub..."
-sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+# Agregar Flathub si no existe
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
-# -------------------------
-# Instalación de Racket
-# -------------------------
-echo "Instalando Racket con Flatpak..."
-flatpak install -y flathub org.racket_lang.Racket
-
-# -------------------------
-# Instalación de Visual Studio Code (versión clásica)
-# -------------------------
-echo "Instalando Visual Studio Code..."
-wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
-sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
-sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
-sudo apt update
-sudo apt install code -y
-rm packages.microsoft.gpg
+# Instalar Racket (silencioso si ya está)
+if ! flatpak list | grep -q org.racket_lang.Racket; then
+  flatpak install -y flathub org.racket_lang.Racket
+else
+  echo "Racket ya está instalado vía Flatpak."
+fi
 
 # -------------------------
-# Instalación de Node.js usando NVM
+# Instalación de Visual Studio Code
 # -------------------------
-echo "Instalando NVM y Node.js..."
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+echo_header "Instalando Visual Studio Code"
+if ! command -v code &> /dev/null; then
+  # Importar clave y repo de forma moderna
+  curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/vscode-archive-keyring.gpg
+  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/vscode-archive-keyring.gpg] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list
 
-echo "en lugar de reiniciar la shell"
-\. "$HOME/.nvm/nvm.sh"
-echo "Instalando 24 ..."
-nvm install 24
+  apt update -y
+  apt install -y code
+else
+  echo "Visual Studio Code ya está instalado."
+fi
 
-# Verificar versiones
-echo "Versión de Node.js instalada:"
-node -v
-echo "Versión actual de NVM:"
-nvm current
-echo "Versión de npm instalada:"
-npm -v
+# -------------------------
+# Instalación de NVM y Node.js 24
+# -------------------------
+echo_header "Instalando NVM y Node.js 24"
+NVM_DIR="/usr/local/nvm"
+export NVM_DIR="$HOME/.nvm"
+
+# Instalar NVM si no existe
+if [[ ! -s "$HOME/.nvm/nvm.sh" ]]; then
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+else
+  echo "NVM ya está instalado."
+fi
+
+# Cargar NVM en el entorno actual
+# shellcheck source=/dev/null
+. "$HOME/.nvm/nvm.sh"
+
+# Instalar Node 24 si no está
+if ! nvm ls 24 &> /dev/null; then
+  nvm install 24
+fi
+
+echo "Versiones instaladas:"
+echo "Node.js: $(node -v || echo 'no disponible')"
+echo "NVM current: $(nvm current || echo 'no disponible')"
+echo "npm: $(npm -v || echo 'no disponible')"
 
 # -------------------------
 # Instalación de Docker
 # -------------------------
-echo "Instalando Docker..."
-sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
-sudo apt update
-apt-cache policy docker-ce
-sudo apt install -y docker-ce docker-ce-cli containerd.io
+echo_header "Instalando Docker"
+if ! command -v docker &> /dev/null; then
+  apt install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release \
+    apt-transport-https \
+    software-properties-common
 
-# Verificar estado del servicio Docker
-echo "Verificando estado de Docker..."
-sudo systemctl start docker
-sudo systemctl enable docker
+  mkdir -p /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker-archive-keyring.gpg
 
-# Agregar usuario al grupo docker
-sudo usermod -aG docker ${USER}
-echo "Docker instalado. Es posible que necesites reiniciar la sesión para aplicar los cambios."
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+    > /etc/apt/sources.list.d/docker.list
 
-# Verificar la instalación de Docker
-echo "Verificando la instalación de Docker..."
-docker --version
-docker info
+  apt update -y
+  apt install -y docker-ce docker-ce-cli containerd.io ${DOCKER_COMPOSE_PLUGIN}
+else
+  echo "Docker ya está instalado."
+fi
 
-# -------------------------
-# Instalación de Docker Compose
-# -------------------------
-echo "Instalando Docker Compose..."
-DOCKER_COMPOSE_VERSION="2.24.0" 
-sudo curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+# Habilitar y arrancar Docker
+systemctl enable docker
+systemctl start docker
 
-# Asignar permisos de ejecución
-sudo chmod +x /usr/local/bin/docker-compose
+# Agregar usuario al grupo docker si no está
+if ! groups "${SUDO_USER:-$USER}" | grep -qw docker; then
+  usermod -aG docker "${SUDO_USER:-$USER}"
+  echo "Se agregó el usuario al grupo docker. Se requiere cerrar sesión o reiniciar sesión para que surta efecto."
+else
+  echo "Usuario ya pertenece al grupo docker."
+fi
 
-# Verificar instalación de Docker Compose
-echo "Versión de Docker Compose instalada:"
-docker-compose --version
+# Verificaciones
+echo "Versión de Docker:" && docker --version || true
+echo "Info de Docker:" && docker info || true
+echo "Versión de Docker Compose:" && docker compose version || true
 
 # -------------------------
 # Instalación de Google Chrome
 # -------------------------
-echo "Instalando Google Chrome..."
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -P /tmp
-sudo apt install -y /tmp/google-chrome-stable_current_amd64.deb
+echo_header "Instalando Google Chrome"
+if ! command -v google-chrome &> /dev/null; then
+  tmpdeb="/tmp/google-chrome-stable_current_amd64.deb"
+  wget -qO "$tmpdeb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+  apt install -y "$tmpdeb" || apt --fix-broken install -y
+  rm -f "$tmpdeb"
+else
+  echo "Google Chrome ya está instalado."
+fi
 
-# Verificar instalación de Chrome
-echo "Versión de Google Chrome instalada:"
-google-chrome --version
+echo "Versión de Google Chrome:" && google-chrome --version || true
 
 # -------------------------
 # Instalación de Minikube
 # -------------------------
-echo "Instalando Minikube..."
-curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-sudo install minikube-linux-amd64 /usr/local/bin/minikube
-
-# Verificar instalación de Minikube
-echo "Versión de Minikube instalada:"
-minikube version
-
-# -----------------------------
-# Instalación de Android Studio
-# -----------------------------
-echo "Instalación de Android Studio:"
-sudo snap install android-studio --classic
-
-# -----------------------------
-# Instalación de scrcpy
-# -----------------------------
-echo "Instalación de scrcpy:"
-sudo apt install scrcpy android-tools-adb -y
-
-
-# -----------------------------
-# Instalación de Virtual box
-# -----------------------------
-echo "Añadiendo prerequisitos para VirtualBox..."
-sudo apt install -y wget gnupg dkms linux-headers-$(uname -r)
-
-echo "Añadiendo la clave GPG de Oracle..."
-wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | sudo gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox.gpg
-
-echo "Añadiendo el repositorio de VirtualBox (jammy)..."
-echo "deb [signed-by=/usr/share/keyrings/oracle-virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian jammy contrib" | sudo tee /etc/apt/sources.list.d/virtualbox.list
-
-echo "Actualizando caché e instalando VirtualBox 7.1..."
-sudo apt update
-sudo apt install -y virtualbox-7.1
-
-echo "Reconstruyendo módulos del kernel si es necesario..."
-if command -v /sbin/vboxconfig &> /dev/null; then
-  sudo /sbin/vboxconfig || true
+echo_header "Instalando Minikube"
+if ! command -v minikube &> /dev/null; then
+  curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+  install minikube-linux-amd64 /usr/local/bin/minikube
+  rm -f minikube-linux-amd64
+else
+  echo "Minikube ya está instalado."
 fi
 
-echo "Verificando la instalación de VirtualBox..."
-virtualbox --version
+echo "Versión de Minikube:" && minikube version || true
+
+# -----------------------------
+# Android Studio
+# -----------------------------
+echo_header "Instalando Android Studio"
+if ! snap list | grep -q android-studio; then
+  snap install android-studio --classic
+else
+  echo "Android Studio ya está instalado."
+fi
+
+# -----------------------------
+# scrcpy y adb
+# -----------------------------
+echo_header "Instalando scrcpy y android-tools-adb"
+apt install -y scrcpy android-tools-adb
+
+# -----------------------------
+# VirtualBox
+# -----------------------------
+echo_header "Instalando VirtualBox 7.1"
+if ! command -v virtualbox &> /dev/null; then
+  apt install -y wget gnupg2 dkms build-essential linux-headers-$(uname -r)
+
+  # Agregar clave y repo
+  mkdir -p /etc/apt/keyrings
+  wget -qO- https://www.virtualbox.org/download/oracle_vbox_2016.asc | gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox.gpg
+  echo "deb [signed-by=/usr/share/keyrings/oracle-virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian $(lsb_release -cs) contrib" \
+    > /etc/apt/sources.list.d/virtualbox.list
+
+  apt update -y
+  apt install -y virtualbox-7.1
+
+  # Reconstruir módulos si existe herramienta
+  if command -v /sbin/vboxconfig &> /dev/null; then
+    /sbin/vboxconfig || true
+  fi
+else
+  echo "VirtualBox ya está instalado."
+fi
+
+echo "Versión de VirtualBox:" && virtualbox --version || true
 
 # -------------------------
 # Finalización
 # -------------------------
-echo "Instalación completa. Recuerda reiniciar la terminal o cerrar sesión para que los cambios surtan efecto."
-
-# Reiniciar el sistema
-echo "Reiniciando el sistema..."
-sudo reboot
+echo_header "Finalización"
+echo "Instalaciones completadas. Recomendado: cerrar sesión o reiniciar el sistema para aplicar cambios de grupo (docker) y entorno de NVM."
+echo "No se reiniciará automáticamente para evitar interrupciones."
 
