@@ -49,6 +49,10 @@ git config --global user.email "ervin.caravali@correounivalle.edu.co"
 git config --global user.name "ErvinCaraval"
 echo "Git configured with user (${GIT_NAME}) and email (${GIT_EMAIL})."
 
+
+## Instalo driver nvidia
+sudo apt install nvidia-driver-470
+
 ## Flatpak and Racket Installation
 
 echo_header "Installing Flatpak and Racket (via Flatpak)"
