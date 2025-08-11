@@ -45,8 +45,8 @@ else
 fi
 
 echo "Configuring Git globally for user ${CURRENT_USER}..."
-git config --global user.email "${GIT_EMAIL}"
-git config --global user.name "${GIT_NAME}"
+git config --global user.email "ervin.caravali@correounivalle.edu.co"
+git config --global user.name "ErvinCaraval"
 echo "Git configured with user (${GIT_NAME}) and email (${GIT_EMAIL})."
 
 ## Flatpak and Racket Installation
