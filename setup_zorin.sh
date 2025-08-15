@@ -45,13 +45,15 @@ else
 fi
 
 echo "Configuring Git globally for user ${CURRENT_USER}..."
-git config --global user.email "ervin.caravali@correounivalle.edu.co"
-git config --global user.name "ErvinCaraval"
+# Configurar Git como el usuario que ejecutó el script, no como root
+runuser -l "${CURRENT_USER}" -c "git config --global user.email \"${GIT_EMAIL}\""
+runuser -l "${CURRENT_USER}" -c "git config --global user.name \"${GIT_NAME}\""
 echo "Git configured with user (${GIT_NAME}) and email (${GIT_EMAIL})."
 
+git config --global --list
 
 ## Instalo driver nvidia
-sudo apt install nvidia-driver-470
+apt install -y nvidia-driver-470
 
 ## Flatpak and Racket Installation
 
