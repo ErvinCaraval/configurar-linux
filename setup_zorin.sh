@@ -50,7 +50,7 @@ runuser -l "${CURRENT_USER}" -c "git config --global user.email \"${GIT_EMAIL}\"
 runuser -l "${CURRENT_USER}" -c "git config --global user.name \"${GIT_NAME}\""
 echo "Git configured with user (${GIT_NAME}) and email (${GIT_EMAIL})."
 
-git config --global --list
+runuser -l "${CURRENT_USER}" -c "git config --global --list"
 
 ## Instalo driver nvidia
 apt install -y nvidia-driver-470
