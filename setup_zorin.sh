@@ -165,20 +165,9 @@ echo "Docker Version:" && docker --version || true
 echo "Docker Info (may require sudo permissions if group not applied):" && docker info || true
 echo "Docker Compose Version:" && docker compose version || true
 
-## Google Chrome Installation
+## Brave Installation
 
-echo_header "Installing Google Chrome"
-if ! command -v google-chrome &> /dev/null; then
-  echo "Google Chrome not found. Downloading and installing..."
-  TMP_DEB_FILE="/tmp/google-chrome-stable_current_amd64.deb"
-  wget -qO "$TMP_DEB_FILE" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-  apt install -y "$TMP_DEB_FILE" || apt --fix-broken install -y
-  rm -f "$TMP_DEB_FILE"
-  echo "Google Chrome installed successfully."
-else
-  echo "Google Chrome is already installed."
-fi
-echo "Google Chrome Version:" && google-chrome --version || true
+curl -fsS https://dl.brave.com/install.sh | sh
 
 ## Minikube Installation
 
