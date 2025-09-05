@@ -18,8 +18,8 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 
 # Configuration variables
-GIT_EMAIL="ervin.caravali@correounivalle.edu.co"
-GIT_NAME="ErvinCaraval"
+GIT_EMAIL="ervincarabali94@hotmail.com"
+GIT_NAME="ErvinCaravaliI"
 DOCKER_COMPOSE_PLUGIN="docker-compose-plugin" # Package name for Docker Compose v2
 CURRENT_USER="${SUDO_USER:-$USER}" # Get the original user who ran sudo
 
@@ -45,9 +45,24 @@ else
 fi
 
 echo "Configuring Git globally for user ${CURRENT_USER}..."
-git config --global user.email "${GIT_EMAIL}"
-git config --global user.name "${GIT_NAME}"
+# Configurar Git como el usuario que ejecutó el script, no como root
+runuser -l "${CURRENT_USER}" -c "git config --global user.email \"${GIT_EMAIL}\""
+runuser -l "${CURRENT_USER}" -c "git config --global user.name \"${GIT_NAME}\""
 echo "Git configured with user (${GIT_NAME}) and email (${GIT_EMAIL})."
+
+runuser -l "${CURRENT_USER}" -c "git config --global --list"
+
+## Instalo driver nvidia
+
+# NVIDIA Driver Installation (Recommended for Ubuntu 25.04)
+echo_header "Installing NVIDIA drivers (recommended for Ubuntu 25.04)"
+if ubuntu-drivers devices &> /dev/null; then
+  echo "Detecting and installing recommended NVIDIA drivers..."
+  ubuntu-drivers autoinstall
+else
+  echo "ubuntu-drivers not found, installing latest available NVIDIA driver."
+  apt install -y nvidia-driver
+fi
 
 ## Flatpak and Racket Installation
 
@@ -84,7 +99,7 @@ if ! command -v code &> /dev/null; then
   apt install -y code
   echo "Visual Studio Code installed successfully."
 else
-  echo "Visual Studio Code is already installed."
+  echo "Visual Code is already installed."
 fi
 
 ## NVM (Node Version Manager) and Node.js 24 Installation
@@ -125,13 +140,15 @@ if ! command -v docker &> /dev/null; then
     curl \
     gnupg \
     lsb-release \
-    software-properties-common
+    software-properties-common # Needed for add-apt-repository
 
   mkdir -m 0755 -p /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
+
+  # Use 'oracular' for Ubuntu 25.04 (Oracular Oriole)
   echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu oracular stable" \
     | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
   apt update -y
@@ -187,24 +204,23 @@ else
 fi
 echo "Minikube Version:" && minikube version || true
 
-## Snap Installation (already enabled in Ubuntu)
-
-echo_header "Ensuring Snap is enabled"
-if ! command -v snap &> /dev/null; then
-  echo "Snap not found. Installing..."
-  apt install -y snapd
-else
-  echo "Snap is already installed (default on Ubuntu)."
+# -------------------------
+## Desbloqueo e instalación de Snap
+# -------------------------
+echo_header "Desbloqueando Snap en Linux Mint/Zorin"
+if [[ -f /etc/apt/preferences.d/nosnap.pref ]]; then
+  mv /etc/apt/preferences.d/nosnap.pref /etc/apt/preferences.d/nosnap.backup
+  echo "Archivo nosnap.pref renombrado para permitir Snap."
 fi
+apt update -y
+apt install -y snapd
 
+# -------------------------
 ## Android Studio (Snap)
-
-echo_header "Installing Android Studio"
+# -------------------------
+echo_header "Instalando Android Studio"
 if ! snap list | grep -q android-studio; then
   snap install android-studio --classic
-  echo "Android Studio installed via Snap."
-else
-  echo "Android Studio is already installed via Snap."
 fi
 
 ## Scrcpy and ADB Installation
@@ -229,72 +245,52 @@ echo "scrcpy and android-tools-adb installed/verified."
 
 ## VirtualBox 7.1 Installation
 
-echo_header "Installing VirtualBox 7.1"
-VBOX_REPO_CODENAME="noble" # Ubuntu 24.04's codename
+# -------------------------
+# VirtualBox 7.1
+# -------------------------
+echo_header "Instalando VirtualBox 7.1"
 
-echo "Configuring VirtualBox repository for codename: ${VBOX_REPO_CODENAME}"
 
-# Only attempt installation if VirtualBox 7.1 is not present
+# For Ubuntu 25.04 (Oracular Oriole), use 'oracular' as codename
+VBOX_REPO_CODENAME="oracular"
+
+echo "Configurando repositorio de VirtualBox para usar codename: ${VBOX_REPO_CODENAME}"
+
+# Solo intentar instalar si VirtualBox 7.1 no está presente
 if ! command -v virtualbox &> /dev/null || ! virtualbox --version | grep -q "7\.1"; then
-  echo "VirtualBox 7.1 not present or is another version. Preparing installation..."
+  echo "VirtualBox 7.1 no está presente o es otra versión. Preparando instalación..."
   
-  # Install necessary dependencies first
+  # Instalar dependencias necesarias primero
   apt install -y wget gnupg2 dkms build-essential linux-headers-"$(uname -r)"
 
-  # Add Oracle GPG key for VirtualBox
+  # Añadir la clave GPG de Oracle para VirtualBox
   mkdir -p /etc/apt/keyrings
   wget -qO- https://www.virtualbox.org/download/oracle_vbox_2016.asc | gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox.gpg
   
-  # Add VirtualBox repository using 'noble'
+
+  # Add the VirtualBox repository using 'oracular'
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/oracle-virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian ${VBOX_REPO_CODENAME} contrib" \
     | tee /etc/apt/sources.list.d/virtualbox.list > /dev/null
 
-  # Update package list after adding new repository
+  # Actualizar la lista de paquetes después de añadir el nuevo repositorio
   apt update -y
   
-  # Install VirtualBox 7.1
+  # Instalar VirtualBox 7.1
   apt install -y virtualbox-7.1
-  echo "VirtualBox 7.1 installed successfully."
+  echo "VirtualBox 7.1 instalado correctamente."
 
-  # Configure VirtualBox kernel modules
+  # Configurar módulos del kernel de VirtualBox
   if command -v /sbin/vboxconfig &> /dev/null; then
-    echo "Running /sbin/vboxconfig to configure kernel modules..."
-    /sbin/vboxconfig || true
+    echo "Ejecutando /sbin/vboxconfig para configurar módulos del kernel..."
+    /sbin/vboxconfig || true # '|| true' para que el script no falle si vboxconfig devuelve un error no crítico
   else
-    echo "Warning: /sbin/vboxconfig not found. You may need to configure modules manually or reboot."
+    echo "Advertencia: /sbin/vboxconfig no se encontró. Puede que necesites configurar módulos manualmente o reiniciar."
   fi
 else
-  echo "VirtualBox 7.1 is already installed."
+  echo "VirtualBox 7.1 ya está instalado."
 fi
 
-echo "VirtualBox Version:" && virtualbox --version || true
-
-## Additional Development Tools
-
-echo_header "Installing Additional Development Tools"
-echo "Installing build essentials, Python, and other common tools..."
-apt install -y \
-  build-essential \
-  python3 \
-  python3-pip \
-  python3-venv \
-  default-jdk \
-  maven \
-  gradle \
-  sqlite3 \
-  postgresql \
-  postgresql-contrib \
-  libpq-dev \
-  redis-server \
-  curl \
-  wget \
-  htop \
-  tree \
-  tmux \
-  neofetch \
-  net-tools
-
-echo "Development tools installed successfully."
+echo "Versión de VirtualBox:" && virtualbox --version || true
 
 ## Finalization
 
@@ -302,4 +298,17 @@ echo_header "Installation Process Completed"
 echo "All main tools have been processed."
 echo "For changes to take full effect (especially adding to the 'docker' group and NVM configuration), it is **highly recommended to log out and back in, or restart your system**."
 echo "The script will not reboot automatically to prevent interruptions."
-echo "Enjoy your development environment on Ubuntu 24.04.3 LTS!"
+
+# -------------------------
+# Unity Desktop Installation (Ubuntu 25.04)
+# -------------------------
+echo_header "Installing Unity Desktop Environment (Ubuntu 25.04)"
+if ! dpkg -l | grep -q '^ii  ubuntu-unity-desktop'; then
+  echo "Unity desktop not found. Installing..."
+  apt install -y ubuntu-unity-desktop
+  echo "Unity desktop installed. You can select it at the login screen."
+else
+  echo "Unity desktop is already installed."
+fi
+
+echo "Enjoy your development environment on Ubuntu 25.04 (Oracular Oriole)!"
