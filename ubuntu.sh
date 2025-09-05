@@ -18,8 +18,8 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 
 # Configuration variables
-GIT_EMAIL="ervincarabali94@hotmail.com"
-GIT_NAME="ErvinCaravaliI"
+GIT_EMAIL="ervin.caravali@correounivalle.edu.co"
+GIT_NAME="ErvinCaraval"
 DOCKER_COMPOSE_PLUGIN="docker-compose-plugin" # Package name for Docker Compose v2
 CURRENT_USER="${SUDO_USER:-$USER}" # Get the original user who ran sudo
 
