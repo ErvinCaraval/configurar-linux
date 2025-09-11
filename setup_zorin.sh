@@ -53,7 +53,7 @@ echo "Git configured with user (${GIT_NAME}) and email (${GIT_EMAIL})."
 runuser -l "${CURRENT_USER}" -c "git config --global --list"
 
 ## Instalo driver nvidia
-apt install -y nvidia-driver-470
+#apt install -y nvidia-driver-470
 
 ## Flatpak and Racket Installation
 
@@ -165,9 +165,6 @@ echo "Docker Version:" && docker --version || true
 echo "Docker Info (may require sudo permissions if group not applied):" && docker info || true
 echo "Docker Compose Version:" && docker compose version || true
 
-## Brave Installation
-
-curl -fsS https://dl.brave.com/install.sh | sh
 
 ## Minikube Installation
 
@@ -222,6 +219,31 @@ else
 fi
 echo "scrcpy and android-tools-adb installed/verified."
 
+
+
+# -------------------------
+# Unity hub
+# -------------------------
+
+wget -qO - https://hub.unity3d.com/linux/keys/public | gpg --dearmor | sudo tee /usr/share/keyrings/Unity_Technologies_ApS.gpg > /dev/null
+
+
+sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/Unity_Technologies_ApS.gpg] https://hub.unity3d.com/linux/repos/deb stable main" > /etc/apt/sources.list.d/unityhub.list'
+
+
+sudo apt update
+
+sudo apt-get install unityhub
+
+
+
+# -------------------------
+# Brave Installation
+# -------------------------
+curl -fsS https://dl.brave.com/install.sh | sh
+
+
+
 ## VirtualBox 7.1 Installation
 
 # -------------------------
@@ -268,22 +290,6 @@ else
 fi
 
 echo "Versión de VirtualBox:" && virtualbox --version || true
-
-
-# -------------------------
-# Unity hub
-# -------------------------
-
-wget -qO - https://hub.unity3d.com/linux/keys/public | gpg --dearmor | sudo tee /usr/share/keyrings/Unity_Technologies_ApS.gpg > /dev/null
-
-
-sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/Unity_Technologies_ApS.gpg] https://hub.unity3d.com/linux/repos/deb stable main" > /etc/apt/sources.list.d/unityhub.list'
-
-
-sudo apt update
-
-sudo apt-get install unityhub
-
 
 ## Finalization
 
