@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 set -euo pipefail
@@ -123,69 +124,62 @@ runuser -l "${CURRENT_USER}" -c "source ${NVM_PROFILE_SCRIPT} && npm -v" || echo
 
 ## Docker Installation
 
-echo "=================================================="
-echo " Installing Docker and Docker Compose"
-echo "=================================================="
-
-CURRENT_USER=$(whoami)
-
-echo "Actual user: ${CURRENT_USER}"
-
-# Verificar si Docker ya está instalado
+echo_header "Installing Docker and Docker Compose"
 if ! command -v docker &> /dev/null; then
-  echo "Docker no encontrado. Agregando repositorio e instalando..."
-
-  # Instalar dependencias necesarias
-  sudo apt update
-  sudo apt install -y \
+  echo "Docker not found. Adding repository and installing..."
+  apt install -y \
     ca-certificates \
     curl \
     gnupg \
     lsb-release \
-    software-properties-common
+    software-properties-common # Needed for add-apt-repository
 
-  # Crear directorio para la clave GPG si no existe
-  sudo mkdir -m 0755 -p /etc/apt/keyrings
+  mkdir -m 0755 -p /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-  # Descargar clave GPG de Docker
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-  # Agregar repositorio de Docker para Ubuntu 22.04 (Jammy)
+  # Use 'noble' for Linux Mint 22.1 "Xia" (based on Ubuntu 24.04 LTS "Noble Numbat")
   echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" | \
-    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" \
+    | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-  # Actualizar lista de paquetes
-  sudo apt update
-
-  # Instalar Docker y plugins
-  sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-  echo "Docker y Docker Compose plugin instalados correctamente."
+  apt update -y
+  apt install -y docker-ce docker-ce-cli containerd.io "${DOCKER_COMPOSE_PLUGIN}"
+  echo "Docker and Docker Compose plugin installed successfully."
 else
-  echo "Docker ya está instalado."
+  echo "Docker is already installed."
 fi
 
-# Habilitar y arrancar el servicio de Docker
-echo "Habilitando y arrancando el servicio de Docker..."
-sudo systemctl enable docker --now
+echo "Enabling and starting Docker service..."
+systemctl enable docker --now
+echo "Docker service enabled and running."
 
-# Añadir el usuario al grupo docker
-echo "Añadiendo al usuario '${CURRENT_USER}' al grupo 'docker'..."
+echo "Adding user ${CURRENT_USER} to 'docker' group if not already a member..."
 if ! groups "${CURRENT_USER}" | grep -qw docker; then
-  sudo usermod -aG docker "${CURRENT_USER}"
-  echo "Usuario ${CURRENT_USER} añadido al grupo 'docker'. Cierra sesión y vuelve a iniciarla para que los cambios surtan efecto."
+  usermod -aG docker "${CURRENT_USER}"
+  echo "User ${CURRENT_USER} added to 'docker' group. You will need to log out and back in (or restart) for changes to take effect and use Docker without 'sudo'."
 else
-  echo "El usuario ${CURRENT_USER} ya pertenece al grupo 'docker'."
+  echo "User ${CURRENT_USER} already belongs to 'docker' group."
 fi
 
-# Verificaciones finales
-echo "Verificando instalaciones:"
-echo "Docker version: $(docker --version || echo 'Error al obtener la versión de Docker')"
-echo "Docker Compose version: $(docker compose version || echo 'Error al obtener la versión de Docker Compose')"
-## Brave Installation
+echo "Verifying Docker installations:"
+echo "Docker Version:" && docker --version || true
+echo "Docker Info (may require sudo permissions if group not applied):" && docker info || true
+echo "Docker Compose Version:" && docker compose version || true
 
-curl -fsS https://dl.brave.com/install.sh | sh
+## Google Chrome Installation
+
+echo_header "Installing Google Chrome"
+if ! command -v google-chrome &> /dev/null; then
+  echo "Google Chrome not found. Downloading and installing..."
+  TMP_DEB_FILE="/tmp/google-chrome-stable_current_amd64.deb"
+  wget -qO "$TMP_DEB_FILE" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+  apt install -y "$TMP_DEB_FILE" || apt --fix-broken install -y
+  rm -f "$TMP_DEB_FILE"
+  echo "Google Chrome installed successfully."
+else
+  echo "Google Chrome is already installed."
+fi
+echo "Google Chrome Version:" && google-chrome --version || true
 
 ## Minikube Installation
 
@@ -240,71 +234,52 @@ else
 fi
 echo "scrcpy and android-tools-adb installed/verified."
 
-# ------------------------- #
-#   VirtualBox 7.0 Install  #
-# ------------------------- #
+## VirtualBox 7.1 Installation
 
-echo "=================================================="
-echo "        Instalando VirtualBox 7.0 en Zorin"
-echo "=================================================="
+# -------------------------
+# VirtualBox 7.1
+# -------------------------
+echo_header "Instalando VirtualBox 7.1"
 
-# Codename correcto para Zorin OS basado en Ubuntu 22.04
-VBOX_REPO_CODENAME="jammy"
+# Para Linux Mint 22.1 (Xia), el repositorio de VirtualBox debe usar 'noble' (Ubuntu 24.04 LTS).
+VBOX_REPO_CODENAME="noble"
 
 echo "Configurando repositorio de VirtualBox para usar codename: ${VBOX_REPO_CODENAME}"
 
-# Solo instalar si no está presente o es otra versión
-if ! command -v virtualbox &> /dev/null || ! virtualbox --version | grep -q "7\.0"; then
-    echo "VirtualBox 7.0 no está presente o es otra versión. Preparando instalación..."
+# Solo intentar instalar si VirtualBox 7.1 no está presente
+if ! command -v virtualbox &> /dev/null || ! virtualbox --version | grep -q "7\.1"; then
+  echo "VirtualBox 7.1 no está presente o es otra versión. Preparando instalación..."
+  
+  # Instalar dependencias necesarias primero
+  apt install -y wget gnupg2 dkms build-essential linux-headers-"$(uname -r)"
 
-    # Instalar dependencias necesarias
-    sudo apt install -y wget gnupg2 dkms build-essential linux-headers-"$(uname -r)"
+  # Añadir la clave GPG de Oracle para VirtualBox
+  mkdir -p /etc/apt/keyrings
+  wget -qO- https://www.virtualbox.org/download/oracle_vbox_2016.asc | gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox.gpg
+  
+  # Añadir el repositorio de VirtualBox usando 'noble'
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/oracle-virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian ${VBOX_REPO_CODENAME} contrib" \
+    | tee /etc/apt/sources.list.d/virtualbox.list > /dev/null # Usar tee con > /dev/null para evitar salida a stdout
 
-    # Añadir clave GPG de Oracle
-    sudo mkdir -p /etc/apt/keyrings
-    wget -qO- https://www.virtualbox.org/download/oracle_vbox_2016.asc | gpg --dearmor | sudo tee /usr/share/keyrings/oracle-virtualbox.gpg > /dev/null
+  # Actualizar la lista de paquetes después de añadir el nuevo repositorio
+  apt update -y
+  
+  # Instalar VirtualBox 7.1
+  apt install -y virtualbox-7.1
+  echo "VirtualBox 7.1 instalado correctamente."
 
-    # Añadir el repositorio oficial para 'jammy' (Ubuntu 22.04)
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/oracle-virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian ${VBOX_REPO_CODENAME} contrib" \
-    | sudo tee /etc/apt/sources.list.d/virtualbox.list > /dev/null
-
-    # Actualizar índices de paquetes
-    sudo apt update -y
-
-    # Instalar VirtualBox 7.0
-    sudo apt install -y virtualbox-7.0
-
-    echo "VirtualBox 7.0 instalado correctamente."
-
-    # Configurar módulos del kernel si está disponible
-    if command -v /sbin/vboxconfig &> /dev/null; then
-        echo "Ejecutando /sbin/vboxconfig para configurar módulos del kernel..."
-        sudo /sbin/vboxconfig || true
-    else
-        echo "Advertencia: /sbin/vboxconfig no se encontró. Podrías necesitar reiniciar para completar la configuración."
-    fi
+  # Configurar módulos del kernel de VirtualBox
+  if command -v /sbin/vboxconfig &> /dev/null; then
+    echo "Ejecutando /sbin/vboxconfig para configurar módulos del kernel..."
+    /sbin/vboxconfig || true # '|| true' para que el script no falle si vboxconfig devuelve un error no crítico
+  else
+    echo "Advertencia: /sbin/vboxconfig no se encontró. Puede que necesites configurar módulos manualmente o reiniciar."
+  fi
 else
-    echo "VirtualBox 7.0 ya está instalado."
+  echo "VirtualBox 7.1 ya está instalado."
 fi
 
-echo "Versión de VirtualBox instalada:"
-virtualbox --version || echo "VirtualBox no se pudo iniciar."
-
-
-# -------------------------
-# Unity hub
-# -------------------------
-
-wget -qO - https://hub.unity3d.com/linux/keys/public | gpg --dearmor | sudo tee /usr/share/keyrings/Unity_Technologies_ApS.gpg > /dev/null
-
-
-sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/Unity_Technologies_ApS.gpg] https://hub.unity3d.com/linux/repos/deb stable main" > /etc/apt/sources.list.d/unityhub.list'
-
-
-sudo apt update
-
-sudo apt-get install unityhub
-
+echo "Versión de VirtualBox:" && virtualbox --version || true
 
 ## Finalization
 
