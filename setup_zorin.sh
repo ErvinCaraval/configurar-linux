@@ -23,6 +23,9 @@ GIT_NAME="ErvinCaraval"
 DOCKER_COMPOSE_PLUGIN="docker-compose-plugin" # Package name for Docker Compose v2
 CURRENT_USER="${SUDO_USER:-$USER}" # Get the original user who ran sudo
 
+# Ubuntu 25.10 codename
+UBUNTU_CODENAME="oracular" # Ubuntu 25.10 Oracular Oriole
+
 ## Update the system
 
 echo_header "Updating the system"
@@ -32,6 +35,13 @@ echo "Running 'apt upgrade'..."
 apt upgrade -y
 echo "Cleaning up unnecessary packages..."
 apt autoremove -y
+
+## Install essential tools
+
+echo_header "Installing essential tools"
+echo "Installing curl, wget, and other essential packages..."
+apt install -y curl wget apt-transport-https ca-certificates gnupg lsb-release
+echo "Essential tools installed successfully."
 
 ## Git Installation and Configuration
 
@@ -52,8 +62,8 @@ echo "Git configured with user (${GIT_NAME}) and email (${GIT_EMAIL})."
 
 runuser -l "${CURRENT_USER}" -c "git config --global --list"
 
-## Instalo driver nvidia
-#apt install -y nvidia-driver-470
+## Instalo driver nvidia (opcional, descomentar si es necesario)
+#apt install -y nvidia-driver-550
 
 ## Flatpak and Racket Installation
 
@@ -66,32 +76,19 @@ else
   echo "Flatpak is already installed."
 fi
 
-echo "Adding Flathub repository if it doesn't exist..."
-flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-echo "Flathub repository configured."
+echo "Adding Flathub repository if it doesn't exist (user-level)..."
+runuser -l "${CURRENT_USER}" -c "flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
+echo "Flathub repository configured for user ${CURRENT_USER}."
 
-if ! flatpak list | grep -q org.racket_lang.Racket; then
-  echo "Racket not found in Flatpak. Installing..."
-  runuser -l "${CURRENT_USER}" -c "flatpak install -y flathub org.racket_lang.Racket"
+if ! runuser -l "${CURRENT_USER}" -c "flatpak list --user" | grep -q org.racket_lang.Racket; then
+  echo "Racket not found in Flatpak. Installing for user ${CURRENT_USER}..."
+  runuser -l "${CURRENT_USER}" -c "flatpak install --user -y flathub org.racket_lang.Racket"
   echo "Racket installed via Flatpak."
 else
   echo "Racket is already installed via Flatpak."
 fi
 
-## Visual Studio Code Installation
 
-echo_header "Installing Visual Studio Code"
-if ! command -v code &> /dev/null; then
-  echo "Visual Studio Code not found. Adding repository and installing..."
-  curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /usr/share/keyrings/vscode-archive-keyring.gpg > /dev/null
-  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/vscode-archive-keyring.gpg] https://packages.microsoft.com/repos/vscode stable main" | tee /etc/apt/sources.list.d/vscode.list > /dev/null
-
-  apt update -y
-  apt install -y code
-  echo "Visual Studio Code installed successfully."
-else
-  echo "Visual Code is already installed."
-fi
 
 ## NVM (Node Version Manager) and Node.js 24 Installation
 
@@ -131,17 +128,27 @@ if ! command -v docker &> /dev/null; then
     curl \
     gnupg \
     lsb-release \
-    software-properties-common # Needed for add-apt-repository
+    software-properties-common
 
   mkdir -m 0755 -p /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-  # Use 'noble' for Linux Mint 22.1 "Xia" (based on Ubuntu 24.04 LTS "Noble Numbat")
+  # Use 'oracular' for Ubuntu 25.10 - fallback to 'noble' if oracular not available yet
   echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable" \
     | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
   apt update -y
+  
+  # If oracular repo doesn't exist yet, fallback to noble
+  if ! apt-cache search docker-ce | grep -q docker-ce; then
+    echo "Docker repository for ${UBUNTU_CODENAME} not available yet. Using 'noble' as fallback..."
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" \
+      | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt update -y
+  fi
+  
   apt install -y docker-ce docker-ce-cli containerd.io "${DOCKER_COMPOSE_PLUGIN}"
   echo "Docker and Docker Compose plugin installed successfully."
 else
@@ -165,7 +172,6 @@ echo "Docker Version:" && docker --version || true
 echo "Docker Info (may require sudo permissions if group not applied):" && docker info || true
 echo "Docker Compose Version:" && docker compose version || true
 
-
 ## Minikube Installation
 
 echo_header "Installing Minikube"
@@ -180,23 +186,27 @@ else
 fi
 echo "Minikube Version:" && minikube version || true
 
-# -------------------------
-## Desbloqueo e instalación de Snap
-# -------------------------
-echo_header "Desbloqueando Snap en Linux Mint/Zorin"
-if [[ -f /etc/apt/preferences.d/nosnap.pref ]]; then
-  mv /etc/apt/preferences.d/nosnap.pref /etc/apt/preferences.d/nosnap.backup
-  echo "Archivo nosnap.pref renombrado para permitir Snap."
-fi
-apt update -y
-apt install -y snapd
+## Snap Installation (Ubuntu viene con Snap por defecto, pero verificamos)
 
-# -------------------------
+echo_header "Verificando instalación de Snap"
+if ! command -v snap &> /dev/null; then
+  echo "Snap no encontrado. Instalando..."
+  apt install -y snapd
+  systemctl enable --now snapd.socket
+  echo "Snap instalado correctamente."
+else
+  echo "Snap ya está instalado."
+fi
+
 ## Android Studio (Snap)
-# -------------------------
+
 echo_header "Instalando Android Studio"
 if ! snap list | grep -q android-studio; then
+  echo "Android Studio no encontrado. Instalando vía Snap..."
   snap install android-studio --classic
+  echo "Android Studio instalado correctamente."
+else
+  echo "Android Studio ya está instalado."
 fi
 
 ## Scrcpy and ADB Installation
@@ -219,82 +229,93 @@ else
 fi
 echo "scrcpy and android-tools-adb installed/verified."
 
+## Unity Hub Installation
 
+echo_header "Instalando Unity Hub"
+if ! command -v unityhub &> /dev/null; then
+  echo "Unity Hub no encontrado. Configurando repositorio e instalando..."
+  wget -qO - https://hub.unity3d.com/linux/keys/public | gpg --dearmor | tee /usr/share/keyrings/Unity_Technologies_ApS.gpg > /dev/null
+  
+  echo "deb [signed-by=/usr/share/keyrings/Unity_Technologies_ApS.gpg] https://hub.unity3d.com/linux/repos/deb stable main" > /etc/apt/sources.list.d/unityhub.list
+  
+  apt update -y
+  apt install -y unityhub
+  echo "Unity Hub instalado correctamente."
+else
+  echo "Unity Hub ya está instalado."
+fi
 
-# -------------------------
-# Unity hub
-# -------------------------
+## Brave Browser Installation
 
-wget -qO - https://hub.unity3d.com/linux/keys/public | gpg --dearmor | sudo tee /usr/share/keyrings/Unity_Technologies_ApS.gpg > /dev/null
+echo_header "Instalando Brave Browser"
+if ! command -v brave-browser &> /dev/null; then
+  echo "Brave Browser no encontrado. Instalando..."
+  curl -fsS https://dl.brave.com/install.sh | sh
+  echo "Brave Browser instalado correctamente."
+else
+  echo "Brave Browser ya está instalado."
+fi
 
+## VirtualBox Installation
 
-sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/Unity_Technologies_ApS.gpg] https://hub.unity3d.com/linux/repos/deb stable main" > /etc/apt/sources.list.d/unityhub.list'
+echo_header "Instalando VirtualBox"
 
-
-sudo apt update
-
-sudo apt-get install unityhub
-
-
-
-# -------------------------
-# Brave Installation
-# -------------------------
-curl -fsS https://dl.brave.com/install.sh | sh
-
-
-
-## VirtualBox 7.1 Installation
-
-# -------------------------
-# VirtualBox 7.1
-# -------------------------
-echo_header "Instalando VirtualBox 7.1"
-
-# Para Linux Mint 22.1 (Xia), el repositorio de VirtualBox debe usar 'noble' (Ubuntu 24.04 LTS).
-VBOX_REPO_CODENAME="noble"
-
-echo "Configurando repositorio de VirtualBox para usar codename: ${VBOX_REPO_CODENAME}"
-
-# Solo intentar instalar si VirtualBox 7.1 no está presente
-if ! command -v virtualbox &> /dev/null || ! virtualbox --version | grep -q "7\.1"; then
-  echo "VirtualBox 7.1 no está presente o es otra versión. Preparando instalación..."
+if ! command -v virtualbox &> /dev/null; then
+  echo "VirtualBox no está instalado. Instalando desde repositorios de Ubuntu..."
   
   # Instalar dependencias necesarias primero
-  apt install -y wget gnupg2 dkms build-essential linux-headers-"$(uname -r)"
-
-  # Añadir la clave GPG de Oracle para VirtualBox
-  mkdir -p /etc/apt/keyrings
-  wget -qO- https://www.virtualbox.org/download/oracle_vbox_2016.asc | gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox.gpg
+  echo "Instalando dependencias del kernel..."
+  apt install -y dkms build-essential linux-headers-"$(uname -r)"
   
-  # Añadir el repositorio de VirtualBox usando 'noble'
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/oracle-virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian ${VBOX_REPO_CODENAME} contrib" \
-    | tee /etc/apt/sources.list.d/virtualbox.list > /dev/null # Usar tee con > /dev/null para evitar salida a stdout
-
-  # Actualizar la lista de paquetes después de añadir el nuevo repositorio
-  apt update -y
+  # Instalar VirtualBox desde los repositorios oficiales de Ubuntu
+  echo "Instalando VirtualBox..."
+  apt install -y virtualbox virtualbox-ext-pack || {
+    echo "No se pudo instalar virtualbox-ext-pack automáticamente."
+    echo "Puedes instalarlo manualmente después con: sudo apt install virtualbox-ext-pack"
+    apt install -y virtualbox
+  }
   
-  # Instalar VirtualBox 7.1
-  apt install -y virtualbox-7.1
-  echo "VirtualBox 7.1 instalado correctamente."
+  echo "VirtualBox instalado correctamente."
 
   # Configurar módulos del kernel de VirtualBox
   if command -v /sbin/vboxconfig &> /dev/null; then
     echo "Ejecutando /sbin/vboxconfig para configurar módulos del kernel..."
-    /sbin/vboxconfig || true # '|| true' para que el script no falle si vboxconfig devuelve un error no crítico
+    /sbin/vboxconfig || true
   else
     echo "Advertencia: /sbin/vboxconfig no se encontró. Puede que necesites configurar módulos manualmente o reiniciar."
   fi
+  
+  # Añadir usuario al grupo vboxusers
+  echo "Añadiendo usuario ${CURRENT_USER} al grupo 'vboxusers'..."
+  if ! groups "${CURRENT_USER}" | grep -qw vboxusers; then
+    usermod -aG vboxusers "${CURRENT_USER}"
+    echo "Usuario ${CURRENT_USER} añadido al grupo 'vboxusers'."
+  else
+    echo "Usuario ${CURRENT_USER} ya pertenece al grupo 'vboxusers'."
+  fi
 else
-  echo "VirtualBox 7.1 ya está instalado."
+  echo "VirtualBox ya está instalado."
 fi
 
 echo "Versión de VirtualBox:" && virtualbox --version || true
+
+echo ""
+echo "NOTA: Si necesitas VirtualBox 7.1 específicamente y tienes problemas de dependencias,"
+echo "puedes intentar instalar manualmente el paquete .deb desde:"
+echo "https://www.virtualbox.org/wiki/Linux_Downloads"
 
 ## Finalization
 
 echo_header "Installation Process Completed"
 echo "All main tools have been processed."
-echo "For changes to take full effect (especially adding to the 'docker' group and NVM configuration), it is **highly recommended to log out and back in, or restart your system**."
+echo ""
+echo "IMPORTANT NEXT STEPS:"
+echo "===================="
+echo "1. For Docker group permissions to take effect, log out and back in, or run: newgrp docker"
+echo "2. For VirtualBox USB support, you need to be in the 'vboxusers' group"
+echo "3. NVM configuration will be available in new terminal sessions"
+echo ""
+echo "Optional: You may want to restart your system for all changes to take full effect."
 echo "The script will not reboot automatically to prevent interruptions."
-echo "Enjoy your development environment on Linux Mint Cinnamon!"
+echo ""
+echo "Enjoy your development environment on Ubuntu 25.10!"
