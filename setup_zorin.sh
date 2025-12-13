@@ -43,6 +43,29 @@ echo "Installing curl, wget, and other essential packages..."
 apt install -y curl wget apt-transport-https ca-certificates gnupg lsb-release
 echo "Essential tools installed successfully."
 
+
+## Install Visual Studio Code
+
+echo_header "Installing Visual Studio Code"
+
+# Import Microsoft GPG key
+echo "Adding Microsoft GPG key..."
+wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/packages.microsoft.gpg
+chmod 644 /usr/share/keyrings/packages.microsoft.gpg
+
+# Add VS Code repository
+echo "Adding VS Code repository..."
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" \
+  > /etc/apt/sources.list.d/vscode.list
+
+# Update package list and install VS Code
+echo "Installing VS Code..."
+apt update -y
+apt install -y code
+
+echo "Visual Studio Code installed successfully."
+
+
 ## Git Installation and Configuration
 
 echo_header "Installing and configuring Git"
@@ -63,7 +86,7 @@ echo "Git configured with user (${GIT_NAME}) and email (${GIT_EMAIL})."
 runuser -l "${CURRENT_USER}" -c "git config --global --list"
 
 ## Instalo driver nvidia (opcional, descomentar si es necesario)
-#apt install -y nvidia-driver-550
+apt install -y nvidia-driver-470
 
 ## Flatpak and Racket Installation
 
