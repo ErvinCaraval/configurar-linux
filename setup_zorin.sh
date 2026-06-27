@@ -85,8 +85,6 @@ echo "Git configured with user (${GIT_NAME}) and email (${GIT_EMAIL})."
 
 runuser -l "${CURRENT_USER}" -c "git config --global --list"
 
-## Instalo driver nvidia (opcional, descomentar si es necesario)
-apt install -y nvidia-driver-470
 
 ## Flatpak and Racket Installation
 
